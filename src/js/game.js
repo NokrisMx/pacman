@@ -53,6 +53,7 @@ function createGame() {
       releaseDelayMs: GHOST_RELEASE_DELAYS_MS[ g.kind ],
       active: false,
     } ) ),
+    roundStartedAtMs: performance.now(),
   };
 }
 
