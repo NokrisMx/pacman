@@ -67,13 +67,21 @@ function drawDoor( ctx, grid ) {
 }
 
 function drawDots( ctx, grid ) {
+  const now = performance.now();
   ctx.fillStyle = DOT_COLOR;
   for ( let y = 0; y < grid.length; y++ ) {
     for ( let x = 0; x < grid[ 0 ].length; x++ ) {
-      if ( grid[ y ][ x ] !== 2 ) continue;
+      const tile = grid[ y ][ x ];
+      if ( tile !== 2 && tile !== 4 ) continue;
       const { cx, cy } = cellCenter( x, y );
       ctx.beginPath();
-      ctx.arc( cx, cy, 2.5, 0, Math.PI * 2 );
+      if ( tile === 2 ) {
+        ctx.arc( cx, cy, 2.5, 0, Math.PI * 2 );
+      } else {
+        const phase = ( ( now / 1000 ) % 1 ) * Math.PI * 2;
+        const radius = 5.5 + 1.5 * Math.sin( phase );
+        ctx.arc( cx, cy, radius, 0, Math.PI * 2 );
+      }
       ctx.fill();
     }
   }
@@ -151,6 +159,23 @@ const GHOST_COLORS = {
   clyde: '#ffb852',
 };
 
+function drawGhostEyes( ctx, g ) {
+  const { cx, cy } = cellCenter( g.x, g.y );
+  const dir = DIRS[ g.dir ] || { x: 0, y: 0 };
+  const ex = dir.x * 1.6;
+  const ey = dir.y * 1.6;
+  for ( const off of [ -3.5, 3.5 ] ) {
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc( cx + off, cy - 1, 3, 0, Math.PI * 2 );
+    ctx.fill();
+    ctx.fillStyle = '#0000bb';
+    ctx.beginPath();
+    ctx.arc( cx + off + ex, cy - 1 + ey, 1.5, 0, Math.PI * 2 );
+    ctx.fill();
+  }
+}
+
 function draw( ctx, game, frame ) {
   const grid = game.grid;
   const W = grid[ 0 ].length;
@@ -163,7 +188,25 @@ function draw( ctx, game, frame ) {
   drawDoor( ctx, grid );
   drawDots( ctx, grid );
   drawPacman( ctx, game.pacman, frame );
-  game.ghosts.forEach( ( g ) => drawGhost( ctx, g, GHOST_COLORS[ g.kind ] || '#ff0000' ) );
+
+  const now = performance.now();
+  game.ghosts.forEach( ( g ) => {
+    if ( g.mode === 'eyes' ) {
+      drawGhostEyes( ctx, g );
+      return;
+    }
+    let color = GHOST_COLORS[ g.kind ] || '#ff0000';
+    if ( g.mode === 'frightened' ) {
+      const remaining = game.frightenedUntilMs - now;
+      if ( remaining <= 2000 && Math.floor( now / 250 ) % 2 === 0 ) {
+        color = '#fff';
+      } else {
+        color = '#2121de';
+      }
+    }
+    drawGhost( ctx, g, color );
+  } );
+
   drawHUD( ctx, game, W );
 }
 

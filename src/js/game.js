@@ -12,6 +12,8 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
+const FRIGHTENED_SPEED = 0.05; // 1/20 celda/frame
+const EYES_SPEED = 0.2;    // 1/5 celda/frame
 
 const GHOST_RELEASE_DELAYS_MS = {
   blinky: 0,
@@ -28,13 +30,15 @@ function createGame() {
   grid[ PACMAN_START.y ][ PACMAN_START.x ] = 0;
 
   let dots = 0;
-  for ( const row of grid ) for ( const v of row ) if ( v === 2 ) dots++;
+  for ( const row of grid ) for ( const v of row ) if ( v === 2 || v === 4 ) dots++;
 
   return {
     state: 'start',
     score: 0,
     lives: 3,
     dotsRemaining: dots,
+    frightenedUntilMs: 0,
+    ghostEatStreak: 0,
     grid,
     pacman: {
       x: PACMAN_START.x,
@@ -52,6 +56,7 @@ function createGame() {
       inPen: g.kind !== 'blinky',
       releaseDelayMs: GHOST_RELEASE_DELAYS_MS[ g.kind ],
       active: false,
+      mode: 'normal',
     } ) ),
     roundStartedAtMs: performance.now(),
   };
@@ -181,11 +186,25 @@ function movePacman( game ) {
       p.dir = p.nextDir;
       p.nextDir = null;
     }
-    // Comer dot.
-    if ( grid[ p.y ][ p.x ] === 2 ) {
+    // Comer dot o power pellet.
+    const tile = grid[ p.y ][ p.x ];
+    if ( tile === 2 ) {
       grid[ p.y ][ p.x ] = 0;
       game.score += 10;
       game.dotsRemaining--;
+    } else if ( tile === 4 ) {
+      grid[ p.y ][ p.x ] = 0;
+      game.score += 50;
+      game.dotsRemaining--;
+      // Activar modo vulnerable
+      game.frightenedUntilMs = performance.now() + 6000;
+      game.ghostEatStreak = 0;
+      game.ghosts.forEach( ( g ) => {
+        if ( g.active && !g.inPen ) {
+          g.mode = 'frightened';
+          g.dir = OPPOSITE[ g.dir ];
+        }
+      } );
     }
     // Si no puede seguir, se detiene en la celda.
     if ( !canMove( grid, p.x, p.y, p.dir, 'pacman' ) ) return;
@@ -207,6 +226,12 @@ function decideGhost( game, g ) {
   } );
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
+
+  // Modo vulnerable: elegir dirección aleatoria sin reversa
+  if ( g.mode === 'frightened' ) {
+    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
+    return;
+  }
 
   if ( g.kind === 'blinky' ) {
     const target = ghostTarget( game, g );
@@ -293,11 +318,34 @@ function chooseExit( grid, fromX, fromY ) {
   return best;
 }
 
+const PEN_EXIT = { x: 13, y: 14 };
+
 function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
   if ( !g.active ) return;
+
+  // Modo ojos: regresar al corral
+  if ( g.mode === 'eyes' ) {
+    if ( aligned( g.x ) && aligned( g.y ) ) {
+      g.x = Math.round( g.x );
+      g.y = Math.round( g.y );
+      // Llegó al corral: recuperar cuerpo
+      if ( g.x === PEN_EXIT.x && g.y === PEN_EXIT.y ) {
+        g.mode = 'normal';
+        g.inPen = false;
+      } else {
+        g.dir = bfsFirstStep( grid, g.x, g.y, PEN_EXIT.x, PEN_EXIT.y, false );
+        if ( !g.dir || !canMove( grid, g.x, g.y, g.dir, { inPen: true } ) ) return;
+      }
+    }
+    const d = DIRS[ g.dir ];
+    g.x += d.x * EYES_SPEED;
+    g.y += d.y * EYES_SPEED;
+    wrapTunnel( g, width );
+    return;
+  }
 
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
@@ -317,9 +365,10 @@ function moveGhost( game, g ) {
     }
   }
 
+  const speed = g.mode === 'frightened' ? FRIGHTENED_SPEED : g.speed;
   const d = DIRS[ g.dir ];
-  g.x += d.x * g.speed;
-  g.y += d.y * g.speed;
+  g.x += d.x * speed;
+  g.y += d.y * speed;
   wrapTunnel( g, width );
 }
 
@@ -335,7 +384,10 @@ function resetPositions( game ) {
     g.dir = 'up';
     g.inPen = GHOST_STARTS[ i ].kind !== 'blinky';
     g.active = false;
+    g.mode = 'normal';
   } );
+  game.frightenedUntilMs = 0;
+  game.ghostEatStreak = 0;
   game.roundStartedAtMs = performance.now();
 }
 
@@ -352,8 +404,28 @@ function update( game ) {
     moveGhost( game, g );
   } );
 
+  // Expirar modo vulnerable
+  const now = performance.now();
+  if ( game.frightenedUntilMs > 0 && now >= game.frightenedUntilMs ) {
+    game.frightenedUntilMs = 0;
+    game.ghosts.forEach( ( g ) => {
+      if ( g.mode === 'frightened' ) {
+        g.mode = 'normal';
+      }
+    } );
+  }
+
   for ( const g of game.ghosts ) {
-    if ( collides( game.pacman, g ) ) {
+    if ( !collides( game.pacman, g ) ) continue;
+
+    if ( g.mode === 'frightened' ) {
+      // Comer fantasma vulnerable
+      const points = 200 * Math.pow( 2, game.ghostEatStreak );
+      game.score += Math.min( points, 1600 );
+      game.ghostEatStreak++;
+      g.mode = 'eyes';
+    } else if ( g.mode !== 'eyes' ) {
+      // Colisión normal: perder vida
       game.lives--;
       if ( game.lives <= 0 ) {
         game.state = 'lost';
