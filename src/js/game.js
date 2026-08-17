@@ -12,6 +12,7 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
+const FRIGHTENED_SPEED = 0.05; // 1/20 celda/frame
 
 const GHOST_RELEASE_DELAYS_MS = {
   blinky: 0,
@@ -225,6 +226,12 @@ function decideGhost( game, g ) {
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
+  // Modo vulnerable: elegir dirección aleatoria sin reversa
+  if ( g.mode === 'frightened' ) {
+    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
+    return;
+  }
+
   if ( g.kind === 'blinky' ) {
     const target = ghostTarget( game, g );
     const bfsDir = bfsFirstStep( grid, g.x, g.y, target.x, target.y, g.inPen );
@@ -334,9 +341,10 @@ function moveGhost( game, g ) {
     }
   }
 
+  const speed = g.mode === 'frightened' ? FRIGHTENED_SPEED : g.speed;
   const d = DIRS[ g.dir ];
-  g.x += d.x * g.speed;
-  g.y += d.y * g.speed;
+  g.x += d.x * speed;
+  g.y += d.y * speed;
   wrapTunnel( g, width );
 }
 
