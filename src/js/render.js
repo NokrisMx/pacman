@@ -67,13 +67,21 @@ function drawDoor( ctx, grid ) {
 }
 
 function drawDots( ctx, grid ) {
+  const now = performance.now();
   ctx.fillStyle = DOT_COLOR;
   for ( let y = 0; y < grid.length; y++ ) {
     for ( let x = 0; x < grid[ 0 ].length; x++ ) {
-      if ( grid[ y ][ x ] !== 2 ) continue;
+      const tile = grid[ y ][ x ];
+      if ( tile !== 2 && tile !== 4 ) continue;
       const { cx, cy } = cellCenter( x, y );
       ctx.beginPath();
-      ctx.arc( cx, cy, 2.5, 0, Math.PI * 2 );
+      if ( tile === 2 ) {
+        ctx.arc( cx, cy, 2.5, 0, Math.PI * 2 );
+      } else {
+        const phase = ( ( now / 1000 ) % 1 ) * Math.PI * 2;
+        const radius = 5.5 + 1.5 * Math.sin( phase );
+        ctx.arc( cx, cy, radius, 0, Math.PI * 2 );
+      }
       ctx.fill();
     }
   }
