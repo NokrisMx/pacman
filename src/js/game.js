@@ -123,6 +123,38 @@ function bfsFirstStep( grid, fromX, fromY, targetX, targetY ) {
   return null;
 }
 
+function ghostTarget( game, g ) {
+  const p = game.pacman;
+  const px = Math.round( p.x );
+  const py = Math.round( p.y );
+  const blinky = game.ghosts.find( ( gh ) => gh.kind === 'blinky' );
+  const bx = Math.round( blinky.x );
+  const by = Math.round( blinky.y );
+
+  if ( g.kind === 'blinky' ) {
+    return { x: px, y: py };
+  }
+
+  if ( g.kind === 'pinky' ) {
+    const d = DIRS[ p.dir ];
+    return { x: px + d.x * 4, y: py + d.y * 4 };
+  }
+
+  if ( g.kind === 'inky' ) {
+    const d = DIRS[ p.dir ];
+    const aheadX = px + d.x * 2;
+    const aheadY = py + d.y * 2;
+    return { x: aheadX * 2 - bx, y: aheadY * 2 - by };
+  }
+
+  // clyde
+  const dx = g.x - px;
+  const dy = g.y - py;
+  const distSq = dx * dx + dy * dy;
+  if ( distSq >= 64 ) return { x: px, y: py };
+  return { x: 0, y: 31 };
+}
+
 function movePacman( game ) {
   const p = game.pacman;
   const grid = game.grid;
