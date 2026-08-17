@@ -384,7 +384,10 @@ function resetPositions( game ) {
     g.dir = 'up';
     g.inPen = GHOST_STARTS[ i ].kind !== 'blinky';
     g.active = false;
+    g.mode = 'normal';
   } );
+  game.frightenedUntilMs = 0;
+  game.ghostEatStreak = 0;
   game.roundStartedAtMs = performance.now();
 }
 
