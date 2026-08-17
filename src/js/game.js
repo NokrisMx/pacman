@@ -13,6 +13,7 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
 const FRIGHTENED_SPEED = 0.05; // 1/20 celda/frame
+const EYES_SPEED = 0.2;    // 1/5 celda/frame
 
 const GHOST_RELEASE_DELAYS_MS = {
   blinky: 0,
@@ -317,11 +318,34 @@ function chooseExit( grid, fromX, fromY ) {
   return best;
 }
 
+const PEN_EXIT = { x: 13, y: 14 };
+
 function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
   if ( !g.active ) return;
+
+  // Modo ojos: regresar al corral
+  if ( g.mode === 'eyes' ) {
+    if ( aligned( g.x ) && aligned( g.y ) ) {
+      g.x = Math.round( g.x );
+      g.y = Math.round( g.y );
+      // Llegó al corral: recuperar cuerpo
+      if ( g.x === PEN_EXIT.x && g.y === PEN_EXIT.y ) {
+        g.mode = 'normal';
+        g.inPen = false;
+      } else {
+        g.dir = bfsFirstStep( grid, g.x, g.y, PEN_EXIT.x, PEN_EXIT.y, false );
+        if ( !g.dir || !canMove( grid, g.x, g.y, g.dir, { inPen: true } ) ) return;
+      }
+    }
+    const d = DIRS[ g.dir ];
+    g.x += d.x * EYES_SPEED;
+    g.y += d.y * EYES_SPEED;
+    wrapTunnel( g, width );
+    return;
+  }
 
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
