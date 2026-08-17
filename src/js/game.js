@@ -270,7 +270,12 @@ function collides( a, b ) {
 
 function update( game ) {
   movePacman( game );
-  game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
+  game.ghosts.forEach( ( g ) => {
+    if ( !g.active && performance.now() - game.roundStartedAtMs >= g.releaseDelayMs ) {
+      g.active = true;
+    }
+    moveGhost( game, g );
+  } );
 
   for ( const g of game.ghosts ) {
     if ( collides( game.pacman, g ) ) {
