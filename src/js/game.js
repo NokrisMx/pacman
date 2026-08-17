@@ -259,7 +259,7 @@ function moveGhost( game, g ) {
         if ( dir ) g.dir = dir;
       }
     }
-    if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
+    if ( aligned( g.x ) && aligned( g.y ) && !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
   } else {
     if ( aligned( g.x ) && aligned( g.y ) ) {
       g.x = Math.round( g.x );
