@@ -260,8 +260,10 @@ function resetPositions( game ) {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
-    g.inPen = GHOST_STARTS[ i ].kind !== 'blinky';
+    g.inPen = false;
+    g.active = false;
   } );
+  game.roundStartedAtMs = performance.now();
 }
 
 function collides( a, b ) {
