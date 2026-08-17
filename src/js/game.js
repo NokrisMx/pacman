@@ -247,36 +247,13 @@ function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
-  if ( g.inPen ) {
-    if ( aligned( g.x ) && aligned( g.y ) ) {
-      g.x = Math.round( g.x );
-      g.y = Math.round( g.y );
-      // Salida del corral: buscar la celda mas cercana entre (13,11) y (14,11)
-      const exits = [ { x: 13, y: 11 }, { x: 14, y: 11 } ];
-      let bestExit = exits[ 0 ];
-      let bestDist = Infinity;
-      for ( const e of exits ) {
-        const dx = g.x - e.x;
-        const dy = g.y - e.y;
-        const dist = dx * dx + dy * dy;
-        if ( dist < bestDist ) { bestDist = dist; bestExit = e; }
-      }
-      // Si ya esta en la salida, salir del corral
-      if ( g.x === bestExit.x && g.y === bestExit.y ) {
-        g.inPen = false;
-      } else {
-        const dir = bfsFirstStep( grid, g.x, g.y, bestExit.x, bestExit.y );
-        if ( dir ) g.dir = dir;
-      }
-    }
-    if ( aligned( g.x ) && aligned( g.y ) && !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
-  } else {
-    if ( aligned( g.x ) && aligned( g.y ) ) {
-      g.x = Math.round( g.x );
-      g.y = Math.round( g.y );
-      decideGhost( game, g );
-      if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
-    }
+  if ( !g.active ) return;
+
+  if ( aligned( g.x ) && aligned( g.y ) ) {
+    g.x = Math.round( g.x );
+    g.y = Math.round( g.y );
+    decideGhost( game, g );
+    if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
   }
 
   const d = DIRS[ g.dir ];
