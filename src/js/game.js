@@ -63,6 +63,11 @@ function isWall( grid, x, y, actor ) {
   return false;
 }
 
+// Una celda es interior del corral?
+function isPenCell( x, y ) {
+  return y >= 13 && y <= 15 && x >= 12 && x <= 15;
+}
+
 // Puede el actor avanzar desde (x,y) en la direccion dir?
 function canMove( grid, x, y, dir, actor ) {
   const d = DIRS[ dir ];
@@ -188,9 +193,18 @@ function movePacman( game ) {
 function decideGhost( game, g ) {
   const grid = game.grid;
 
-  const options = Object.keys( DIRS ).filter(
-    ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
-  );
+  const options = Object.keys( DIRS ).filter( ( dir ) => {
+    if ( dir === OPPOSITE[ g.dir ] ) return false;
+    if ( !canMove( grid, g.x, g.y, dir, 'ghost' ) ) return false;
+    // Bloquear reentrada al corral cuando inPen es false
+    if ( !g.inPen ) {
+      const d = DIRS[ dir ];
+      const nx = g.x + d.x;
+      const ny = g.y + d.y;
+      if ( isPenCell( nx, ny ) ) return false;
+    }
+    return true;
+  } );
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
