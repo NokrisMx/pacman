@@ -81,6 +81,48 @@ function wrapTunnel( a, width ) {
   }
 }
 
+function bfsFirstStep( grid, fromX, fromY, targetX, targetY ) {
+  const width = grid[ 0 ].length;
+  const height = grid.length;
+
+  function neighbors( x, y ) {
+    const dirs = [ 'up', 'left', 'down', 'right' ];
+    const result = [];
+    for ( const dir of dirs ) {
+      const d = DIRS[ dir ];
+      let nx = x + d.x;
+      let ny = y + d.y;
+      // Tunel fila 14
+      if ( ny === TUNNEL_ROW ) {
+        if ( nx < 0 ) nx += width;
+        else if ( nx >= width ) nx -= width;
+      }
+      if ( ny < 0 || ny >= height || nx < 0 || nx >= width ) continue;
+      if ( grid[ ny ][ nx ] === 1 ) continue;
+      result.push( { nx, ny, dir } );
+    }
+    return result;
+  }
+
+  const key = ( x, y ) => `${x},${y}`;
+  const visited = new Set();
+  const queue = [ { x: fromX, y: fromY, firstDir: null } ];
+  visited.add( key( fromX, fromY ) );
+
+  while ( queue.length ) {
+    const { x, y, firstDir } = queue.shift();
+    if ( x === targetX && y === targetY ) return firstDir;
+
+    for ( const { nx, ny, dir } of neighbors( x, y ) ) {
+      const k = key( nx, ny );
+      if ( visited.has( k ) ) continue;
+      visited.add( k );
+      queue.push( { x: nx, y: ny, firstDir: firstDir || dir } );
+    }
+  }
+  return null;
+}
+
 function movePacman( game ) {
   const p = game.pacman;
   const grid = game.grid;
