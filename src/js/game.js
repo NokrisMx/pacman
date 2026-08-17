@@ -63,13 +63,14 @@ function aligned( v ) {
 
 // Una celda es muro para el actor dado?
 //   pacman: bloqueado por pared (1) y puerta (3)
-//   ghost:  bloqueado solo por pared (1)
+//   ghost:  bloqueado por pared (1); puerta (3) solo si inPen es false
 function isWall( grid, x, y, actor ) {
   if ( y < 0 || y >= grid.length ) return true;
   if ( x < 0 || x >= grid[ 0 ].length ) return true;
   const v = grid[ y ][ x ];
   if ( v === 1 ) return true;
-  if ( v === 3 ) return true;
+  if ( v === 3 && actor === 'pacman' ) return true;
+  if ( v === 3 && typeof actor === 'object' && !actor.inPen ) return true;
   return false;
 }
 
@@ -91,7 +92,7 @@ function wrapTunnel( a, width ) {
   }
 }
 
-function bfsFirstStep( grid, fromX, fromY, targetX, targetY ) {
+function bfsFirstStep( grid, fromX, fromY, targetX, targetY, inPen ) {
   const width = grid[ 0 ].length;
   const height = grid.length;
 
@@ -109,6 +110,7 @@ function bfsFirstStep( grid, fromX, fromY, targetX, targetY ) {
       }
       if ( ny < 0 || ny >= height || nx < 0 || nx >= width ) continue;
       if ( grid[ ny ][ nx ] === 1 ) continue;
+      if ( grid[ ny ][ nx ] === 3 && !inPen ) continue;
       result.push( { nx, ny, dir } );
     }
     return result;
@@ -200,7 +202,7 @@ function decideGhost( game, g ) {
 
   const options = Object.keys( DIRS ).filter( ( dir ) => {
     if ( dir === OPPOSITE[ g.dir ] ) return false;
-    if ( !canMove( grid, g.x, g.y, dir, 'ghost' ) ) return false;
+    if ( !canMove( grid, g.x, g.y, dir, g ) ) return false;
     return true;
   } );
   // Sin salida (callejon): permitir el giro de 180.
@@ -208,7 +210,7 @@ function decideGhost( game, g ) {
 
   if ( g.kind === 'blinky' ) {
     const target = ghostTarget( game, g );
-    const bfsDir = bfsFirstStep( grid, g.x, g.y, target.x, target.y );
+    const bfsDir = bfsFirstStep( grid, g.x, g.y, target.x, target.y, g.inPen );
     g.dir = bfsDir && choices.includes( bfsDir ) ? bfsDir : choices[ 0 ];
     return;
   }
@@ -241,7 +243,7 @@ function moveGhost( game, g ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
     decideGhost( game, g );
-    if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
+    if ( !canMove( grid, g.x, g.y, g.dir, g ) ) return;
   }
 
   const d = DIRS[ g.dir ];
