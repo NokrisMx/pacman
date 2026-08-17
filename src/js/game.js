@@ -49,7 +49,7 @@ function createGame() {
       dir: 'up',
       speed: GHOST_SPEED,
       kind: g.kind,
-      inPen: false,
+      inPen: g.kind !== 'blinky',
       releaseDelayMs: GHOST_RELEASE_DELAYS_MS[ g.kind ],
       active: false,
     } ) ),
@@ -260,7 +260,7 @@ function resetPositions( game ) {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
-    g.inPen = false;
+    g.inPen = GHOST_STARTS[ i ].kind !== 'blinky';
     g.active = false;
   } );
   game.roundStartedAtMs = performance.now();
