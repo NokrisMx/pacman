@@ -206,13 +206,6 @@ function decideGhost( game, g ) {
   const options = Object.keys( DIRS ).filter( ( dir ) => {
     if ( dir === OPPOSITE[ g.dir ] ) return false;
     if ( !canMove( grid, g.x, g.y, dir, 'ghost' ) ) return false;
-    // Bloquear reentrada al corral cuando inPen es false
-    if ( !g.inPen ) {
-      const d = DIRS[ dir ];
-      const nx = g.x + d.x;
-      const ny = g.y + d.y;
-      if ( isPenCell( nx, ny ) ) return false;
-    }
     return true;
   } );
   // Sin salida (callejon): permitir el giro de 180.
