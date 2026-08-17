@@ -53,9 +53,9 @@ const TUNNEL_ROW = 14;
 const PACMAN_START = { x: 13, y: 23 };
 const GHOST_STARTS = [
   { x: 13, y: 11, kind: 'blinky' },
-  { x: 14, y: 11, kind: 'pinky' },
-  { x: 12, y: 11, kind: 'inky' },
-  { x: 15, y: 11, kind: 'clyde' },
+  { x: 13, y: 14, kind: 'pinky' },
+  { x: 12, y: 14, kind: 'inky' },
+  { x: 15, y: 14, kind: 'clyde' },
 ];
 
 window.MAZE = MAZE;
