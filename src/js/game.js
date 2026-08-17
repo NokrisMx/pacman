@@ -35,6 +35,8 @@ function createGame() {
     score: 0,
     lives: 3,
     dotsRemaining: dots,
+    frightenedUntilMs: 0,
+    ghostEatStreak: 0,
     grid,
     pacman: {
       x: PACMAN_START.x,
@@ -52,6 +54,7 @@ function createGame() {
       inPen: g.kind !== 'blinky',
       releaseDelayMs: GHOST_RELEASE_DELAYS_MS[ g.kind ],
       active: false,
+      mode: 'normal',
     } ) ),
     roundStartedAtMs: performance.now(),
   };
@@ -191,6 +194,15 @@ function movePacman( game ) {
       grid[ p.y ][ p.x ] = 0;
       game.score += 50;
       game.dotsRemaining--;
+      // Activar modo vulnerable
+      game.frightenedUntilMs = performance.now() + 6000;
+      game.ghostEatStreak = 0;
+      game.ghosts.forEach( ( g ) => {
+        if ( g.active && !g.inPen ) {
+          g.mode = 'frightened';
+          g.dir = OPPOSITE[ g.dir ];
+        }
+      } );
     }
     // Si no puede seguir, se detiene en la celda.
     if ( !canMove( grid, p.x, p.y, p.dir, 'pacman' ) ) return;
@@ -356,6 +368,17 @@ function update( game ) {
     }
     moveGhost( game, g );
   } );
+
+  // Expirar modo vulnerable
+  const now = performance.now();
+  if ( game.frightenedUntilMs > 0 && now >= game.frightenedUntilMs ) {
+    game.frightenedUntilMs = 0;
+    game.ghosts.forEach( ( g ) => {
+      if ( g.mode === 'frightened' ) {
+        g.mode = 'normal';
+      }
+    } );
+  }
 
   for ( const g of game.ghosts ) {
     if ( collides( game.pacman, g ) ) {
