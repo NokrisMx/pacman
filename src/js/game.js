@@ -42,6 +42,7 @@ function createGame() {
       dir: 'up',
       speed: GHOST_SPEED,
       kind: g.kind,
+      inPen: g.kind !== 'blinky',
     } ) ),
   };
 }
@@ -62,6 +63,11 @@ function isWall( grid, x, y, actor ) {
   return false;
 }
 
+// Una celda es interior del corral?
+function isPenCell( x, y ) {
+  return y >= 13 && y <= 15 && x >= 12 && x <= 15;
+}
+
 // Puede el actor avanzar desde (x,y) en la direccion dir?
 function canMove( grid, x, y, dir, actor ) {
   const d = DIRS[ dir ];
@@ -78,6 +84,80 @@ function wrapTunnel( a, width ) {
     if ( a.x < 0 ) a.x += width;
     else if ( a.x >= width ) a.x -= width;
   }
+}
+
+function bfsFirstStep( grid, fromX, fromY, targetX, targetY ) {
+  const width = grid[ 0 ].length;
+  const height = grid.length;
+
+  function neighbors( x, y ) {
+    const dirs = [ 'up', 'left', 'down', 'right' ];
+    const result = [];
+    for ( const dir of dirs ) {
+      const d = DIRS[ dir ];
+      let nx = x + d.x;
+      let ny = y + d.y;
+      // Tunel fila 14
+      if ( ny === TUNNEL_ROW ) {
+        if ( nx < 0 ) nx += width;
+        else if ( nx >= width ) nx -= width;
+      }
+      if ( ny < 0 || ny >= height || nx < 0 || nx >= width ) continue;
+      if ( grid[ ny ][ nx ] === 1 ) continue;
+      result.push( { nx, ny, dir } );
+    }
+    return result;
+  }
+
+  const key = ( x, y ) => `${x},${y}`;
+  const visited = new Set();
+  const queue = [ { x: fromX, y: fromY, firstDir: null } ];
+  visited.add( key( fromX, fromY ) );
+
+  while ( queue.length ) {
+    const { x, y, firstDir } = queue.shift();
+    if ( x === targetX && y === targetY ) return firstDir;
+
+    for ( const { nx, ny, dir } of neighbors( x, y ) ) {
+      const k = key( nx, ny );
+      if ( visited.has( k ) ) continue;
+      visited.add( k );
+      queue.push( { x: nx, y: ny, firstDir: firstDir || dir } );
+    }
+  }
+  return null;
+}
+
+function ghostTarget( game, g ) {
+  const p = game.pacman;
+  const px = Math.round( p.x );
+  const py = Math.round( p.y );
+  const blinky = game.ghosts.find( ( gh ) => gh.kind === 'blinky' );
+  const bx = Math.round( blinky.x );
+  const by = Math.round( blinky.y );
+
+  if ( g.kind === 'blinky' ) {
+    return { x: px, y: py };
+  }
+
+  if ( g.kind === 'pinky' ) {
+    const d = DIRS[ p.dir ];
+    return { x: px + d.x * 4, y: py + d.y * 4 };
+  }
+
+  if ( g.kind === 'inky' ) {
+    const d = DIRS[ p.dir ];
+    const aheadX = px + d.x * 2;
+    const aheadY = py + d.y * 2;
+    return { x: aheadX * 2 - bx, y: aheadY * 2 - by };
+  }
+
+  // clyde
+  const dx = g.x - px;
+  const dy = g.y - py;
+  const distSq = dx * dx + dy * dy;
+  if ( distSq >= 64 ) return { x: px, y: py };
+  return { x: 0, y: 31 };
 }
 
 function movePacman( game ) {
@@ -112,44 +192,81 @@ function movePacman( game ) {
 
 function decideGhost( game, g ) {
   const grid = game.grid;
-  const p = game.pacman;
 
-  const options = Object.keys( DIRS ).filter(
-    ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
-  );
-  // Sin salida (callejon): permitir el giro de 180.
-  const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
-
-  if ( g.kind === 'hunter' ) {
-    const px = Math.round( p.x );
-    const py = Math.round( p.y );
-    let best = choices[ 0 ];
-    let bestDist = Infinity;
-    for ( const dir of choices ) {
+  const options = Object.keys( DIRS ).filter( ( dir ) => {
+    if ( dir === OPPOSITE[ g.dir ] ) return false;
+    if ( !canMove( grid, g.x, g.y, dir, 'ghost' ) ) return false;
+    // Bloquear reentrada al corral cuando inPen es false
+    if ( !g.inPen ) {
       const d = DIRS[ dir ];
       const nx = g.x + d.x;
       const ny = g.y + d.y;
-      const dist = Math.abs( nx - px ) + Math.abs( ny - py );
-      if ( dist < bestDist ) {
-        bestDist = dist;
-        best = dir;
-      }
+      if ( isPenCell( nx, ny ) ) return false;
     }
-    g.dir = best;
-  } else {
-    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
+    return true;
+  } );
+  // Sin salida (callejon): permitir el giro de 180.
+  const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
+
+  if ( g.kind === 'blinky' ) {
+    const target = ghostTarget( game, g );
+    const bfsDir = bfsFirstStep( grid, g.x, g.y, target.x, target.y );
+    g.dir = bfsDir && choices.includes( bfsDir ) ? bfsDir : choices[ 0 ];
+    return;
   }
+
+  const target = ghostTarget( game, g );
+  let best = choices[ 0 ];
+  let bestDist = Infinity;
+  for ( const dir of choices ) {
+    const d = DIRS[ dir ];
+    const nx = g.x + d.x;
+    const ny = g.y + d.y;
+    const dx = nx - target.x;
+    const dy = ny - target.y;
+    const dist = dx * dx + dy * dy;
+    if ( dist < bestDist ) {
+      bestDist = dist;
+      best = dir;
+    }
+  }
+  g.dir = best;
 }
 
 function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
-  if ( aligned( g.x ) && aligned( g.y ) ) {
-    g.x = Math.round( g.x );
-    g.y = Math.round( g.y );
-    decideGhost( game, g );
-    if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
+  if ( g.inPen ) {
+    if ( aligned( g.x ) && aligned( g.y ) ) {
+      g.x = Math.round( g.x );
+      g.y = Math.round( g.y );
+      // Salida del corral: buscar la celda mas cercana entre (13,11) y (14,11)
+      const exits = [ { x: 13, y: 11 }, { x: 14, y: 11 } ];
+      let bestExit = exits[ 0 ];
+      let bestDist = Infinity;
+      for ( const e of exits ) {
+        const dx = g.x - e.x;
+        const dy = g.y - e.y;
+        const dist = dx * dx + dy * dy;
+        if ( dist < bestDist ) { bestDist = dist; bestExit = e; }
+      }
+      // Si ya esta en la salida, salir del corral
+      if ( g.x === bestExit.x && g.y === bestExit.y ) {
+        g.inPen = false;
+      } else {
+        const dir = bfsFirstStep( grid, g.x, g.y, bestExit.x, bestExit.y );
+        if ( dir ) g.dir = dir;
+      }
+    }
+    if ( aligned( g.x ) && aligned( g.y ) && !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
+  } else {
+    if ( aligned( g.x ) && aligned( g.y ) ) {
+      g.x = Math.round( g.x );
+      g.y = Math.round( g.y );
+      decideGhost( game, g );
+      if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
+    }
   }
 
   const d = DIRS[ g.dir ];
@@ -168,6 +285,7 @@ function resetPositions( game ) {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
+    g.inPen = GHOST_STARTS[ i ].kind !== 'blinky';
   } );
 }
 
