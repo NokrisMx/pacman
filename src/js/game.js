@@ -73,11 +73,6 @@ function isWall( grid, x, y, actor ) {
   return false;
 }
 
-// Una celda es interior del corral?
-function isPenCell( x, y ) {
-  return y >= 13 && y <= 15 && x >= 12 && x <= 15;
-}
-
 // Puede el actor avanzar desde (x,y) en la direccion dir?
 function canMove( grid, x, y, dir, actor ) {
   const d = DIRS[ dir ];
