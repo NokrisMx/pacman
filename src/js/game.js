@@ -49,7 +49,9 @@ function createGame() {
       dir: 'up',
       speed: GHOST_SPEED,
       kind: g.kind,
-      inPen: g.kind !== 'blinky',
+      inPen: false,
+      releaseDelayMs: GHOST_RELEASE_DELAYS_MS[ g.kind ],
+      active: false,
     } ) ),
   };
 }
