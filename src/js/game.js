@@ -389,7 +389,16 @@ function update( game ) {
   }
 
   for ( const g of game.ghosts ) {
-    if ( collides( game.pacman, g ) ) {
+    if ( !collides( game.pacman, g ) ) continue;
+
+    if ( g.mode === 'frightened' ) {
+      // Comer fantasma vulnerable
+      const points = 200 * Math.pow( 2, game.ghostEatStreak );
+      game.score += Math.min( points, 1600 );
+      game.ghostEatStreak++;
+      g.mode = 'eyes';
+    } else if ( g.mode !== 'eyes' ) {
+      // Colisión normal: perder vida
       game.lives--;
       if ( game.lives <= 0 ) {
         game.state = 'lost';
