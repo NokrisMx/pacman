@@ -285,6 +285,7 @@ function resetPositions( game ) {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
+    g.inPen = GHOST_STARTS[ i ].kind !== 'blinky';
   } );
 }
 
