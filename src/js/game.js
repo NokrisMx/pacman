@@ -233,6 +233,66 @@ function decideGhost( game, g ) {
   g.dir = best;
 }
 
+function bfsDistance( grid, fromX, fromY, targetX, targetY, inPen ) {
+  const width = grid[ 0 ].length;
+  const height = grid.length;
+
+  function neighbors( x, y ) {
+    const dirs = [ 'up', 'left', 'down', 'right' ];
+    const result = [];
+    for ( const dir of dirs ) {
+      const d = DIRS[ dir ];
+      let nx = x + d.x;
+      let ny = y + d.y;
+      if ( ny === TUNNEL_ROW ) {
+        if ( nx < 0 ) nx += width;
+        else if ( nx >= width ) nx -= width;
+      }
+      if ( ny < 0 || ny >= height || nx < 0 || nx >= width ) continue;
+      if ( grid[ ny ][ nx ] === 1 ) continue;
+      if ( grid[ ny ][ nx ] === 3 && !inPen ) continue;
+      result.push( { nx, ny } );
+    }
+    return result;
+  }
+
+  const key = ( x, y ) => `${x},${y}`;
+  const visited = new Set();
+  const queue = [ { x: fromX, y: fromY, dist: 0 } ];
+  visited.add( key( fromX, fromY ) );
+
+  while ( queue.length ) {
+    const { x, y, dist } = queue.shift();
+    if ( x === targetX && y === targetY ) return dist;
+
+    for ( const { nx, ny } of neighbors( x, y ) ) {
+      const k = key( nx, ny );
+      if ( visited.has( k ) ) continue;
+      visited.add( k );
+      queue.push( { x: nx, y: ny, dist: dist + 1 } );
+    }
+  }
+  return Infinity;
+}
+
+const EXIT_CELLS = [
+  { x: 13, y: 11 },
+  { x: 14, y: 11 },
+];
+
+function chooseExit( grid, fromX, fromY ) {
+  let best = EXIT_CELLS[ 0 ];
+  let bestDist = Infinity;
+  for ( const exit of EXIT_CELLS ) {
+    const dist = bfsDistance( grid, fromX, fromY, exit.x, exit.y, true );
+    if ( dist < bestDist ) {
+      bestDist = dist;
+      best = exit;
+    }
+  }
+  return best;
+}
+
 function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
@@ -242,8 +302,19 @@ function moveGhost( game, g ) {
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
-    decideGhost( game, g );
-    if ( !canMove( grid, g.x, g.y, g.dir, g ) ) return;
+
+    if ( g.inPen ) {
+      const exit = chooseExit( grid, g.x, g.y );
+      if ( g.x === exit.x && g.y === exit.y ) {
+        g.inPen = false;
+      } else {
+        g.dir = bfsFirstStep( grid, g.x, g.y, exit.x, exit.y, true );
+        if ( !g.dir || !canMove( grid, g.x, g.y, g.dir, g ) ) return;
+      }
+    } else {
+      decideGhost( game, g );
+      if ( !canMove( grid, g.x, g.y, g.dir, g ) ) return;
+    }
   }
 
   const d = DIRS[ g.dir ];
