@@ -13,6 +13,13 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
 
+const GHOST_RELEASE_DELAYS_MS = {
+  blinky: 0,
+  pinky: 2000,
+  inky: 4000,
+  clyde: 6000,
+};
+
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
 function createGame() {
@@ -42,8 +49,11 @@ function createGame() {
       dir: 'up',
       speed: GHOST_SPEED,
       kind: g.kind,
-      inPen: g.kind !== 'blinky',
+      inPen: false,
+      releaseDelayMs: GHOST_RELEASE_DELAYS_MS[ g.kind ],
+      active: false,
     } ) ),
+    roundStartedAtMs: performance.now(),
   };
 }
 
@@ -59,13 +69,8 @@ function isWall( grid, x, y, actor ) {
   if ( x < 0 || x >= grid[ 0 ].length ) return true;
   const v = grid[ y ][ x ];
   if ( v === 1 ) return true;
-  if ( v === 3 && actor === 'pacman' ) return true;
+  if ( v === 3 ) return true;
   return false;
-}
-
-// Una celda es interior del corral?
-function isPenCell( x, y ) {
-  return y >= 13 && y <= 15 && x >= 12 && x <= 15;
 }
 
 // Puede el actor avanzar desde (x,y) en la direccion dir?
@@ -196,13 +201,6 @@ function decideGhost( game, g ) {
   const options = Object.keys( DIRS ).filter( ( dir ) => {
     if ( dir === OPPOSITE[ g.dir ] ) return false;
     if ( !canMove( grid, g.x, g.y, dir, 'ghost' ) ) return false;
-    // Bloquear reentrada al corral cuando inPen es false
-    if ( !g.inPen ) {
-      const d = DIRS[ dir ];
-      const nx = g.x + d.x;
-      const ny = g.y + d.y;
-      if ( isPenCell( nx, ny ) ) return false;
-    }
     return true;
   } );
   // Sin salida (callejon): permitir el giro de 180.
@@ -237,36 +235,13 @@ function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
-  if ( g.inPen ) {
-    if ( aligned( g.x ) && aligned( g.y ) ) {
-      g.x = Math.round( g.x );
-      g.y = Math.round( g.y );
-      // Salida del corral: buscar la celda mas cercana entre (13,11) y (14,11)
-      const exits = [ { x: 13, y: 11 }, { x: 14, y: 11 } ];
-      let bestExit = exits[ 0 ];
-      let bestDist = Infinity;
-      for ( const e of exits ) {
-        const dx = g.x - e.x;
-        const dy = g.y - e.y;
-        const dist = dx * dx + dy * dy;
-        if ( dist < bestDist ) { bestDist = dist; bestExit = e; }
-      }
-      // Si ya esta en la salida, salir del corral
-      if ( g.x === bestExit.x && g.y === bestExit.y ) {
-        g.inPen = false;
-      } else {
-        const dir = bfsFirstStep( grid, g.x, g.y, bestExit.x, bestExit.y );
-        if ( dir ) g.dir = dir;
-      }
-    }
-    if ( aligned( g.x ) && aligned( g.y ) && !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
-  } else {
-    if ( aligned( g.x ) && aligned( g.y ) ) {
-      g.x = Math.round( g.x );
-      g.y = Math.round( g.y );
-      decideGhost( game, g );
-      if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
-    }
+  if ( !g.active ) return;
+
+  if ( aligned( g.x ) && aligned( g.y ) ) {
+    g.x = Math.round( g.x );
+    g.y = Math.round( g.y );
+    decideGhost( game, g );
+    if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
   }
 
   const d = DIRS[ g.dir ];
@@ -285,8 +260,10 @@ function resetPositions( game ) {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
-    g.inPen = GHOST_STARTS[ i ].kind !== 'blinky';
+    g.inPen = false;
+    g.active = false;
   } );
+  game.roundStartedAtMs = performance.now();
 }
 
 function collides( a, b ) {
@@ -295,7 +272,12 @@ function collides( a, b ) {
 
 function update( game ) {
   movePacman( game );
-  game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
+  game.ghosts.forEach( ( g ) => {
+    if ( !g.active && performance.now() - game.roundStartedAtMs >= g.releaseDelayMs ) {
+      g.active = true;
+    }
+    moveGhost( game, g );
+  } );
 
   for ( const g of game.ghosts ) {
     if ( collides( game.pacman, g ) ) {
