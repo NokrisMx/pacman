@@ -69,7 +69,7 @@ function isWall( grid, x, y, actor ) {
   if ( x < 0 || x >= grid[ 0 ].length ) return true;
   const v = grid[ y ][ x ];
   if ( v === 1 ) return true;
-  if ( v === 3 && actor === 'pacman' ) return true;
+  if ( v === 3 ) return true;
   return false;
 }
 
